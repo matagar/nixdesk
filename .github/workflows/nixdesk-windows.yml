@@ -36,6 +36,9 @@ jobs:
       configuration: Release
       platform: x64
       target_version: Windows10
+      # Ventana de privacidad propia (ver src/privacy_mode/win_topmost_window.rs).
+      window-title: NixDeskPrivacyWindow
+      window-class: NixDeskPrivacyWindowClass
 
   build-for-windows-flutter:
     name: x86_64-pc-windows-msvc

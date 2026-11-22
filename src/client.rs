@@ -440,7 +440,7 @@ impl Client {
         if hbb_common::is_ip_str(peer) {
             return Ok((
                 (
-                    connect_tcp_local(check_port(peer, RELAY_PORT + 1), None, CONNECT_TIMEOUT)
+                    connect_tcp_local(check_port(peer, crate::common::DIRECT_ACCESS_PORT), None, CONNECT_TIMEOUT)
                         .await?,
                     true,
                     None,

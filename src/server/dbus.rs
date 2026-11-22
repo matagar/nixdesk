@@ -10,7 +10,23 @@ use hbb_common::log;
 use std::collections::HashMap;
 use std::{error::Error, fmt, time::Duration};
 
-const DBUS_NAME: &str = "org.rustdesk.rustdesk";
+// El nombre en el bus de sesión sale del nombre de la aplicación, para que dos
+// productos derivados (por ejemplo RustDesk y NixDesk) no se disputen el mismo nombre
+// ni reciban los enlaces del otro. Con el nombre original da "org.rustdesk.rustdesk".
+fn dbus_name() -> &'static str {
+    static NAME: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    NAME.get_or_init(|| {
+        let mut name: String = crate::get_app_name()
+            .to_lowercase()
+            .chars()
+            .filter(|c| c.is_ascii_alphanumeric() || *c == '_')
+            .collect();
+        if name.is_empty() || name.starts_with(|c: char| c.is_ascii_digit()) {
+            name = "rustdesk".to_owned();
+        }
+        format!("org.{name}.{name}")
+    })
+}
 const DBUS_PREFIX: &str = "/dbus";
 const DBUS_METHOD_NEW_CONNECTION: &str = "NewConnection";
 const DBUS_METHOD_NEW_CONNECTION_ID: &str = "id";
@@ -38,9 +54,9 @@ impl Error for DbusError {}
 pub fn invoke_new_connection(uni_links: String) -> Result<(), Box<dyn Error>> {
     log::info!("Starting dbus service for uni");
     let conn = Connection::new_session()?;
-    let proxy = conn.with_proxy(DBUS_NAME, DBUS_PREFIX, DBUS_TIMEOUT);
+    let proxy = conn.with_proxy(dbus_name(), DBUS_PREFIX, DBUS_TIMEOUT);
     let (ret,): (String,) =
-        proxy.method_call(DBUS_NAME, DBUS_METHOD_NEW_CONNECTION, (uni_links,))?;
+        proxy.method_call(dbus_name(), DBUS_METHOD_NEW_CONNECTION, (uni_links,))?;
     if ret != DBUS_METHOD_RETURN_SUCCESS {
         log::error!("error on call new connection to dbus server");
         return Err(Box::new(DbusError("not success".to_string())));
@@ -55,9 +71,9 @@ pub fn invoke_new_connection(uni_links: String) -> Result<(), Box<dyn Error>> {
 /// So it's suitable to spawn a new thread dedicated to dbus server.
 pub fn start_dbus_server() -> Result<(), Box<dyn Error>> {
     let conn: Connection = Connection::new_session()?;
-    let _ = conn.request_name(DBUS_NAME, false, true, false)?;
+    let _ = conn.request_name(dbus_name(), false, true, false)?;
     let mut cr = Crossroads::new();
-    let token = cr.register(DBUS_NAME, handle_client_message);
+    let token = cr.register(dbus_name(), handle_client_message);
     cr.insert(DBUS_PREFIX, &[token], ());
     cr.serve(&conn)?;
     Ok(())

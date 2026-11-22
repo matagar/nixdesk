@@ -26,6 +26,15 @@ on:
             required: true
             type: string
             default: 'Windows10'
+        # NixDesk: nombre y clase de la ventana de privacidad. Vacíos, queda la de RustDesk.
+        # Tienen que coincidir con PRIVACY_WINDOW_NAME y PRIVACY_WINDOW_CLASS de
+        # src/privacy_mode/win_topmost_window.rs.
+        window-title:
+            type: string
+            default: ''
+        window-class:
+            type: string
+            default: ''
 
 env:
   project_path: WindowInjection/WindowInjection.vcxproj
@@ -45,9 +54,32 @@ jobs:
         run: |
           git clone https://github.com/rustdesk-org/RustDeskTempTopMostWindow RustDeskTempTopMostWindow
 
-      - name: Build the project
+      - name: Checkout the pinned commit
         run: |
           cd RustDeskTempTopMostWindow && git checkout ecd8d6a139eee76845ea66423fb739af450fda90
+
+      # Dos productos en la misma máquina no pueden compartir la clase ni el título de la
+      # ventana de privacidad: cada uno busca las suyas con FindWindowEx. Si el fuente
+      # cambia y alguna línea ya no coincide, el paso falla.
+      - name: Rename the privacy window
+        if: ${{ inputs.window-title != '' && inputs.window-class != '' }}
+        shell: bash
+        env:
+          WINDOW_TITLE: ${{ inputs.window-title }}
+          WINDOW_CLASS: ${{ inputs.window-class }}
+        run: |
+          f=RustDeskTempTopMostWindow/WindowInjection/dllmain.cpp
+          sed -i \
+            -e "s|_T(\"RustDeskPrivacyWindow\")|_T(\"${WINDOW_TITLE}\")|" \
+            -e "s|_T(\"RustDeskPrivacyWindowClass\")|_T(\"${WINDOW_CLASS}\")|" \
+            "$f"
+          grep -nF "const TCHAR* WindowTitle = _T(\"${WINDOW_TITLE}\");" "$f"
+          grep -nF "const TCHAR* ClassName = _T(\"${WINDOW_CLASS}\");" "$f"
+          if grep -n "RustDeskPrivacyWindow" "$f"; then exit 1; fi
+
+      - name: Build the project
+        run: |
+          cd RustDeskTempTopMostWindow
           msbuild ${{ env.project_path }} -p:Configuration=${{ inputs.configuration }} -p:Platform=${{ inputs.platform }} /p:TargetVersion=${{ inputs.target_version }}
 
       - name: Archive build artifacts

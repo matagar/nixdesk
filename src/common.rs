@@ -53,6 +53,13 @@ pub type NotifyMessageBox = fn(String, String, String, String) -> dyn Future<Out
 // the executable name of the portable version
 pub const PORTABLE_APPNAME_RUNTIME_ENV_KEY: &str = "RUSTDESK_APPNAME";
 
+// NixDesk: puertos locales de escucha propios, para convivir en la misma máquina con
+// un RustDesk oficial, que usa RENDEZVOUS_PORT + 2 (TCP 21118) para el acceso directo
+// por IP y RENDEZVOUS_PORT + 3 (UDP 21119) para el descubrimiento en la red local.
+// Los puertos del servidor (RENDEZVOUS_PORT, RELAY_PORT y los de WebSocket) no cambian.
+pub const DIRECT_ACCESS_PORT: i32 = 21218;
+pub const LAN_DISCOVERY_PORT: u16 = 21219;
+
 pub const PLATFORM_WINDOWS: &str = "Windows";
 pub const PLATFORM_LINUX: &str = "Linux";
 pub const PLATFORM_MACOS: &str = "Mac OS";
