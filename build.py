@@ -353,22 +353,32 @@ def get_features(args):
     return features
 
 
+# NixDesk: nombre del paquete deb, del binario, del servicio y de las carpetas instaladas.
+# Es distinto de `rustdesk` a propósito: el paquete no declara Conflicts, Replaces ni
+# Provides y no comparte ninguna ruta con el paquete oficial, así que los dos pueden
+# estar instalados y con el servicio activo a la vez.
+LINUX_PACKAGE_NAME = 'nixdesk'
+
+
 def generate_control_file(version):
     control_file_path = "../res/DEBIAN/control"
     system2('/bin/rm -rf %s' % control_file_path)
 
-    content = """Package: rustdesk
+    content = """Package: %s
 Section: net
 Priority: optional
 Version: %s
 Architecture: %s
-Maintainer: rustdesk <info@rustdesk.com>
-Homepage: https://rustdesk.com
+Maintainer: Matias Alejandro Garcia Quiroga <matagar@gmail.com>
+Homepage: https://github.com/matagar/nixdesk
 Depends: libgtk-3-0t64 | libgtk-3-0, libxcb-randr0, libxdo3 | libxdo4, libxfixes3, libxcb-shape0, libxcb-xfixes0, libasound2t64 | libasound2, libsystemd0, curl, libva2, libva-drm2, libva-x11-2, libgstreamer-plugins-base1.0-0, gstreamer1.0-pipewire%s
 Recommends: libayatana-appindicator3-1
-Description: A remote control software.
+Description: NixDesk remote control software.
+ Based on RustDesk (https://rustdesk.com), licensed under the AGPL-3.0.
+ Installs side by side with the rustdesk package: own binary, service,
+ configuration and local ports.
 
-""" % (version, get_deb_arch(), get_deb_extra_depends())
+""" % (LINUX_PACKAGE_NAME, version, get_deb_arch(), get_deb_extra_depends())
     file = open(control_file_path, "w")
     file.write(content)
     file.close()
@@ -735,59 +745,52 @@ def retarget_control_to_drm_variant():
 
 
 def build_flutter_deb(version, features):
+    name = LINUX_PACKAGE_NAME
+    if 'drm' in features.split(','):
+        # La variante `drm` de RustDesk reemplaza al paquete `rustdesk` (Conflicts/Replaces/Provides)
+        # y carga su biblioteca desde /usr/lib/rustdesk: no es compatible con un paquete que
+        # tiene que convivir con el oficial.
+        raise Exception('--drm is not supported by the NixDesk deb packaging')
     if not skip_cargo:
         system2(f'cargo build --locked --features {features} --lib --release')
         ffi_bindgen_function_refactor()
     os.chdir('flutter')
     system2('flutter build linux --release')
     system2('mkdir -p tmpdeb/usr/bin/')
-    system2('mkdir -p tmpdeb/usr/share/rustdesk')
-    system2('mkdir -p tmpdeb/usr/share/rustdesk/files/systemd/')
+    system2(f'mkdir -p tmpdeb/usr/share/{name}')
+    system2(f'mkdir -p tmpdeb/usr/share/{name}/files/systemd/')
     system2('mkdir -p tmpdeb/usr/share/icons/hicolor/256x256/apps/')
     system2('mkdir -p tmpdeb/usr/share/icons/hicolor/scalable/apps/')
     system2('mkdir -p tmpdeb/usr/share/applications/')
-    system2('mkdir -p tmpdeb/usr/share/polkit-1/actions')
-    system2('rm tmpdeb/usr/bin/rustdesk || true')
+    system2(f'mkdir -p tmpdeb/usr/share/doc/{name}')
     system2(
-        f'cp -r {flutter_build_dir}/* tmpdeb/usr/share/rustdesk/')
+        f'cp -r {flutter_build_dir}/* tmpdeb/usr/share/{name}/')
+    # El ejecutable del paquete se llama como el paquete (BINARY_NAME en flutter/linux/CMakeLists.txt):
+    # el servicio y la búsqueda de procesos usan el nombre de la aplicación en minúsculas.
+    if not os.path.isfile(f'tmpdeb/usr/share/{name}/{name}'):
+        raise Exception(f'the flutter bundle has no executable named {name}')
     system2(
-        'cp ../res/rustdesk.service tmpdeb/usr/share/rustdesk/files/systemd/')
+        f'cp ../res/{name}.service tmpdeb/usr/share/{name}/files/systemd/')
     system2(
-        'cp ../res/128x128@2x.png tmpdeb/usr/share/icons/hicolor/256x256/apps/rustdesk.png')
+        f'cp ../res/128x128@2x.png tmpdeb/usr/share/icons/hicolor/256x256/apps/{name}.png')
     system2(
-        'cp ../res/scalable.svg tmpdeb/usr/share/icons/hicolor/scalable/apps/rustdesk.svg')
+        f'cp assets/icon.svg tmpdeb/usr/share/icons/hicolor/scalable/apps/{name}.svg')
     system2(
-        'cp ../res/rustdesk.desktop tmpdeb/usr/share/applications/rustdesk.desktop')
+        f'cp ../res/{name}.desktop tmpdeb/usr/share/applications/{name}.desktop')
     system2(
-        'cp ../res/rustdesk-link.desktop tmpdeb/usr/share/applications/rustdesk-link.desktop')
-    system2(
-        "echo \"#!/bin/sh\" >> tmpdeb/usr/share/rustdesk/files/polkit && chmod a+x tmpdeb/usr/share/rustdesk/files/polkit")
-    # Bundle libdrmtap.so only when this build actually enabled the `drm` feature, so stock packages
-    # stay exactly what they were. The root service dlopens it in-process by absolute path.
-    # `features` is the comma-joined string, so split it: a bare substring test would also match any
-    # future feature merely containing "drm" (drm-lease, vaapi-drm) and rename the deb to the
-    # consent-bypass variant without --drm ever being passed.
-    ships_so = 'drm' in features.split(',')
-    if ships_so:
-        # Same artifact assertion as the --package path. Under --skip-cargo nothing here rebuilt the
-        # binary, so `features` says what was ASKED for while the staged bundle can be anything.
-        assert_staged_binary_is_drm()
-        stage_libdrmtap_into_deb(build_libdrmtap_so())
+        f'cp ../res/{name}-link.desktop tmpdeb/usr/share/applications/{name}-link.desktop')
+    # Licencia (AGPL-3.0) y origen del código.
+    system2(f'cp ../LICENCE tmpdeb/usr/share/doc/{name}/copyright')
 
     system2('mkdir -p tmpdeb/DEBIAN')
     generate_control_file(version)
-    if ships_so:
-        retarget_control_to_drm_variant()
     system2('cp -a ../res/DEBIAN/* tmpdeb/DEBIAN/')
     md5_file_folder("tmpdeb/")
-    system2('dpkg-deb -b tmpdeb rustdesk.deb;')
+    system2(f'dpkg-deb -b tmpdeb {name}.deb;')
 
     system2('/bin/rm -rf tmpdeb/')
     system2('/bin/rm -rf ../res/DEBIAN/control')
-    os.rename('rustdesk.deb', '../rustdesk-%s.deb' % version)
-    if ships_so:
-        # Named apart from the stock package so installing the consent-free variant is a deliberate act.
-        os.rename('../rustdesk-%s.deb' % version, f'../{DRM_PACKAGE_NAME}-{version}.deb')
+    os.rename(f'{name}.deb', f'../{name}-{version}.deb')
     os.chdir("..")
 
 

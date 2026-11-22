@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=NixDesk
+NoDisplay=true
+MimeType=x-scheme-handler/nixdesk;
+TryExec=nixdesk
+Exec=nixdesk %u
+Icon=nixdesk
+Terminal=false
+Type=Application
+StartupNotify=false
+StartupWMClass=nixdesk
