@@ -39,7 +39,6 @@ const double _kRadioLeftMargin = 10;
 const double _kListViewBottomMargin = 15;
 const double _kTitleFontSize = 20;
 const double _kContentFontSize = 15;
-const Color _accentColor = MyTheme.accent;
 const String _kSettingPageControllerTag = 'settingPageController';
 const String _kSettingPageTabKeyTag = 'settingPageTabKey';
 
@@ -309,8 +308,8 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
     final settingsText = Text(
       translate('Settings'),
       textAlign: TextAlign.left,
-      style: const TextStyle(
-        color: _accentColor,
+      style: TextStyle(
+        color: NixColor.acento(context),
         fontSize: _kTitleFontSize,
         fontWeight: FontWeight.w400,
       ),
@@ -355,6 +354,7 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
   Widget _listItem({required _TabInfo tab}) {
     return Obx(() {
       bool selected = tab.key == selectedTab.value;
+      final accentColor = NixColor.acento(context);
       return SizedBox(
         width: _kTabWidth,
         height: _kTabHeight,
@@ -373,17 +373,17 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
             Container(
               width: 4,
               height: _kTabHeight * 0.7,
-              color: selected ? _accentColor : null,
+              color: selected ? accentColor : null,
             ),
             Icon(
               selected ? tab.selected : tab.unselected,
-              color: selected ? _accentColor : null,
+              color: selected ? accentColor : null,
               size: 20,
             ).marginOnly(left: 13, right: 10),
             Text(
               translate(tab.label),
               style: TextStyle(
-                  color: selected ? _accentColor : null,
+                  color: selected ? accentColor : null,
                   fontWeight: FontWeight.w400,
                   fontSize: _kContentFontSize),
             ),
@@ -1883,7 +1883,7 @@ class _NetworkState extends State<_Network> with AutomaticKeepAliveClientMixin {
             );
 
       return ListTile(
-        leading: Icon(icon, color: _accentColor),
+        leading: Icon(icon, color: NixColor.acento(context)),
         title: titleWidget,
         enabled: !locked,
         onTap: onTap,
@@ -2591,7 +2591,9 @@ class _AboutState extends State<_About> {
       final buildDate = data['buildDate'].toString();
       final fingerprint = data['fingerprint'].toString();
       final myId = data['myId'].toString();
-      const linkStyle = TextStyle(decoration: TextDecoration.underline);
+      final linkStyle = TextStyle(
+          decoration: TextDecoration.underline,
+          color: NixColor.acento(context));
       final scrollController = ScrollController();
       return SingleChildScrollView(
         controller: scrollController,
@@ -2617,24 +2619,37 @@ class _AboutState extends State<_About> {
                       .marginSymmetric(vertical: 4.0)),
               InkWell(
                   onTap: () {
-                    launchUrlString('https://rustdesk.com/privacy.html');
+                    launchUrlString(NixUrl.fuente);
                   },
                   child: Text(
-                    translate('Privacy Statement'),
+                    '${translate('nixdesk_source_code')}: ${NixUrl.fuente}',
                     style: linkStyle,
                   ).marginSymmetric(vertical: 4.0)),
               InkWell(
                   onTap: () {
-                    launchUrlString('https://rustdesk.com');
+                    launchUrlString(NixUrl.licencia);
                   },
                   child: Text(
-                    translate('Website'),
+                    translate('nixdesk_license'),
                     style: linkStyle,
                   ).marginSymmetric(vertical: 4.0)),
+              InkWell(
+                  onTap: () {
+                    launchUrlString(NixUrl.rustdesk);
+                  },
+                  child: Text(
+                    '${translate('nixdesk_upstream')}: ${NixUrl.rustdesk}',
+                    style: linkStyle,
+                  ).marginSymmetric(vertical: 4.0)),
+              // Aviso legal: NixDesk es una obra derivada de RustDesk (AGPL-3.0).
+              // El copyright de RustDesk se conserva tal cual.
               Container(
-                decoration: const BoxDecoration(color: Color(0xFF2c8cff)),
+                decoration: const BoxDecoration(
+                    color: NixColor.carbon,
+                    border: Border(
+                        left: BorderSide(color: NixColor.naranja, width: 4))),
                 padding:
-                    const EdgeInsets.symmetric(vertical: 24, horizontal: 8),
+                    const EdgeInsets.symmetric(vertical: 20, horizontal: 14),
                 child: SelectionArea(
                     child: Row(
                   children: [
@@ -2643,15 +2658,15 @@ class _AboutState extends State<_About> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Copyright © ${DateTime.now().toString().substring(0, 4)} Purslane Tech Pte. Ltd.\n$license',
-                            style: const TextStyle(color: Colors.white),
-                          ),
+                            translate('nixdesk_based_on_tip'),
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: NixColor.niebla),
+                          ).marginOnly(bottom: 10),
                           Text(
-                            translate('Slogan_tip'),
-                            style: TextStyle(
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white),
-                          )
+                            'Copyright © ${DateTime.now().toString().substring(0, 4)} Purslane Tech Pte. Ltd.\n$license',
+                            style: const TextStyle(color: NixColor.niebla),
+                          ),
                         ],
                       ),
                     ),
@@ -2933,6 +2948,7 @@ class _WaylandCardState extends State<WaylandCard> {
       showConfirmMsgBox,
       tip: 'clear_Wayland_screen_selection_tip',
       style: ButtonStyle(
+        foregroundColor: MaterialStateProperty.all<Color>(Colors.white),
         backgroundColor: MaterialStateProperty.all<Color>(
             Theme.of(context).colorScheme.error.withOpacity(0.75)),
       ),
@@ -2976,6 +2992,7 @@ class _WaylandCardState extends State<WaylandCard> {
         showConfirmMsgBox,
         tip: 'clear-shortcuts-inhibitor-permission-tip',
         style: ButtonStyle(
+          foregroundColor: MaterialStateProperty.all<Color>(Colors.white),
           backgroundColor: MaterialStateProperty.all<Color>(
               Theme.of(context).colorScheme.error.withOpacity(0.75)),
         ),

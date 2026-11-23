@@ -351,7 +351,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                                   Icons.refresh,
                                   color: refreshHover.value
                                       ? textColor
-                                      : Color(0xFFDDDDDD),
+                                      : textColor?.withOpacity(0.6),
                                   size: 22,
                                 ))),
                           ),
@@ -366,7 +366,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                                 Icons.edit,
                                 color: editHover.value
                                     ? textColor
-                                    : Color(0xFFDDDDDD),
+                                    : textColor?.withOpacity(0.6),
                                 size: 22,
                               ).marginOnly(right: 8, top: 4),
                             ),
@@ -625,8 +625,8 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                 begin: Alignment.centerLeft,
                 end: Alignment.centerRight,
                 colors: [
-                  Color.fromARGB(255, 226, 66, 188),
-                  Color.fromARGB(255, 244, 114, 124),
+                  NixColor.naranjaHondo,
+                  NixColor.naranjaProfundo,
                 ],
               )),
               padding: EdgeInsets.all(20),

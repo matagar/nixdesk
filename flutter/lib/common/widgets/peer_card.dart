@@ -148,7 +148,7 @@ class _PeerCardState extends State<_PeerCard>
       children: [
         Container(
             decoration: BoxDecoration(
-              color: str2color('${peer.id}${peer.platform}', 0x7f),
+              color: NixColor.tarjeta('${peer.id}${peer.platform}'),
               borderRadius: isPortrait
                   ? BorderRadius.circular(_tileRadius)
                   : BorderRadius.only(
@@ -306,7 +306,7 @@ class _PeerCardState extends State<_PeerCard>
               children: [
                 Expanded(
                   child: Container(
-                    color: str2color('${peer.id}${peer.platform}', 0x7f),
+                    color: NixColor.tarjeta('${peer.id}${peer.platform}'),
                     child: Row(
                       children: [
                         Expanded(
@@ -346,7 +346,7 @@ class _PeerCardState extends State<_PeerCard>
                                       child: Text(
                                         peer.note,
                                         style: const TextStyle(
-                                            color: Colors.white38,
+                                            color: Colors.white60,
                                             fontSize: 10),
                                         textAlign: TextAlign.center,
                                         overflow: TextOverflow.ellipsis,

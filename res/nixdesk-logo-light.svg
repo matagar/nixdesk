@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 440 120" width="440" height="120">
+<g transform="translate(4,12) scale(0.1875)"><rect width="512" height="512" rx="112" fill="#0b0f17"/><rect x="6" y="6" width="500" height="500" rx="106" fill="none" stroke="#2a3650" stroke-width="12"/>
+<rect x="84" y="112" width="250" height="176" rx="24" fill="none" stroke="#d5deec" stroke-width="28"/>
+<rect x="188" y="214" width="250" height="176" rx="24" fill="#0b0f17" stroke="#f38a20" stroke-width="28"/>
+<polyline points="262,268 300,302 262,336" fill="none" stroke="#f38a20" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(126,32) scale(0.56)" fill="none" stroke="#0b0f17" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"><path d="M0,100 V0 L60,100 V0" transform="translate(0,0)"/><path d="M0,100 V32" transform="translate(90,0)"/><circle cx="90" cy="4" r="10" fill="#f38a20" stroke="none"/><path d="M0,30 L50,100 M50,30 L0,100" transform="translate(118,0)"/><path d="M0,0 V100 H22 A50,50 0 0 0 22,0 Z" transform="translate(198,0)"/><path d="M0,65 H70 A35,35 0 1 0 61.8,87.5" transform="translate(294,0)"/><path d="M37.9,40.1 A17.5,17.5 0 1 0 22,65 A17.5,17.5 0 1 1 6.1,89.9" transform="translate(388,0)"/><path d="M0,0 V100 M48,30 L0,72 M18,58 L50,100" transform="translate(455,0)"/></g>
+</svg>

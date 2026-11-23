@@ -293,5 +293,9 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("android-logs-folder-tip", "Choose Android → media to store log files."),
         ("install-directory-not-empty-tip", "The selected folder is not empty. Installation may delete existing data. Consider choosing a different folder."),
         ("username-login-disabled-oidc-unavailable", "Username and password login is disabled, and no OIDC login methods are available."),
+        ("nixdesk_based_on_tip", "NixDesk is a modified version of RustDesk, free software under the AGPL-3.0 license. The source code of this version is public."),
+        ("nixdesk_source_code", "Source code of NixDesk"),
+        ("nixdesk_license", "License (AGPL-3.0)"),
+        ("nixdesk_upstream", "RustDesk project"),
     ].iter().cloned().collect();
 }

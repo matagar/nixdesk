@@ -267,7 +267,8 @@ const String kMsgboxTextWaitingForImage = 'Connected, waiting for image...';
 // the executable name of the portable version
 const String kEnvPortableExecutable = "RUSTDESK_APPNAME";
 
-const Color kColorWarn = Color.fromARGB(255, 245, 133, 59);
+// Ámbar, para que el aviso no se confunda con el naranja de la marca.
+const Color kColorWarn = Color(0xFFE2B33C);
 const Color kColorCanvas = Colors.black;
 
 const int kMobileDefaultDisplayWidth = 720;

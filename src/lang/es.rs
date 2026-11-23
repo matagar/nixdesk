@@ -827,5 +827,9 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("Request approval", "Solicitar aprobación"),
         ("Forever", "Para siempre"),
         ("username-login-disabled-oidc-unavailable", "El inicio de sesión con nombre de usuario y contraseña está deshabilitado y no hay métodos de inicio de sesión OIDC disponibles."),
+        ("nixdesk_based_on_tip", "NixDesk es una versión modificada de RustDesk, software libre bajo la licencia AGPL-3.0. El código fuente de esta versión es público."),
+        ("nixdesk_source_code", "Código fuente de NixDesk"),
+        ("nixdesk_license", "Licencia (AGPL-3.0)"),
+        ("nixdesk_upstream", "Proyecto RustDesk"),
     ].iter().cloned().collect();
 }

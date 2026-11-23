@@ -1511,7 +1511,7 @@ class PopupMenuButtonState<T> extends State<PopupMenuButton<T>> {
       onPressed: widget.enabled ? showButtonMenu : null,
       enableFeedback: enableFeedback,
       color: MyTheme.button,
-      hoverColor: MyTheme.accent,
+      hoverColor: MyTheme.buttonHover,
     );
   }
 }

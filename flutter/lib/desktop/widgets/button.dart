@@ -52,19 +52,23 @@ class _ButtonState extends State<Button> {
                 padding: EdgeInsets.all(widget.padding ?? 4.5),
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: pressed.value
-                      ? MyTheme.accent
-                      : (widget.isOutline
-                          ? Colors.transparent
-                          : MyTheme.button),
+                  color: widget.isOutline
+                      ? (pressed.value
+                          ? MyTheme.accent.withOpacity(0.18)
+                          : Colors.transparent)
+                      : (pressed.value || hover.value
+                          ? MyTheme.accentHover
+                          : MyTheme.accent),
                   border: Border.all(
-                    color: pressed.value
-                        ? MyTheme.accent
-                        : hover.value
+                    color: widget.isOutline
+                        ? (pressed.value || hover.value
                             ? MyTheme.hoverBorder
-                            : (widget.isOutline
-                                ? widget.borderColor ?? MyTheme.border
-                                : MyTheme.button),
+                            : widget.borderColor ??
+                                MyTheme.color(context).border ??
+                                MyTheme.border)
+                        : (pressed.value || hover.value
+                            ? MyTheme.accentHover
+                            : MyTheme.accent),
                   ),
                   borderRadius: BorderRadius.circular(widget.radius ?? 5),
                 ),
@@ -77,7 +81,7 @@ class _ButtonState extends State<Button> {
                       color: widget.isOutline
                           ? widget.textColor ??
                               Theme.of(context).textTheme.titleLarge?.color
-                          : Colors.white),
+                          : MyTheme.onAccent),
                 ).marginSymmetric(horizontal: 12),
               )),
         ));
@@ -131,17 +135,23 @@ class _FixedWidthButtonState extends State<FixedWidthButton> {
             padding: EdgeInsets.all(widget.padding ?? 4.5),
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: pressed.value
-                  ? MyTheme.accent
-                  : (widget.isOutline ? Colors.transparent : MyTheme.button),
+              color: widget.isOutline
+                  ? (pressed.value
+                      ? MyTheme.accent.withOpacity(0.18)
+                      : Colors.transparent)
+                  : (pressed.value || hover.value
+                      ? MyTheme.accentHover
+                      : MyTheme.accent),
               border: Border.all(
-                color: pressed.value
-                    ? MyTheme.accent
-                    : hover.value
+                color: widget.isOutline
+                    ? (pressed.value || hover.value
                         ? MyTheme.hoverBorder
-                        : (widget.isOutline
-                            ? widget.borderColor ?? MyTheme.border
-                            : MyTheme.button),
+                        : widget.borderColor ??
+                            MyTheme.color(context).border ??
+                            MyTheme.border)
+                    : (pressed.value || hover.value
+                        ? MyTheme.accentHover
+                        : MyTheme.accent),
               ),
               borderRadius: BorderRadius.circular(widget.radius ?? 5),
             ),
@@ -160,7 +170,7 @@ class _FixedWidthButtonState extends State<FixedWidthButton> {
                         color: widget.isOutline
                             ? widget.textColor ??
                                 Theme.of(context).textTheme.titleLarge?.color
-                            : Colors.white),
+                            : MyTheme.onAccent),
                   ).marginSymmetric(horizontal: 12),
                 ),
               ],

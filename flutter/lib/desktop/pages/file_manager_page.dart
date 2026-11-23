@@ -338,8 +338,8 @@ class _FileManagerPageState extends State<FileManagerPage>
                                   "assets/refresh.svg",
                                   colorFilter: svgColor(Colors.white),
                                 ),
-                                color: MyTheme.accent,
-                                hoverColor: MyTheme.accent80,
+                                color: MyTheme.button,
+                                hoverColor: MyTheme.buttonHover,
                               ),
                             ),
                             MenuButton(
@@ -352,8 +352,8 @@ class _FileManagerPageState extends State<FileManagerPage>
                                 jobController.jobTable.removeAt(index);
                                 jobController.cancelJob(item.id);
                               },
-                              color: MyTheme.accent,
-                              hoverColor: MyTheme.accent80,
+                              color: MyTheme.button,
+                              hoverColor: MyTheme.buttonHover,
                             ),
                           ],
                         ).marginAll(12),
@@ -1195,14 +1195,14 @@ class _FileManagerViewState extends State<FileManagerView> {
             child: Obx(() => Container(
                 decoration: BoxDecoration(
                   color: selectedItems.items.contains(entry)
-                      ? MyTheme.button
+                      ? NixColor.seleccion(context)
                       : Theme.of(context).cardColor,
                   borderRadius: BorderRadius.all(
                     Radius.circular(5.0),
                   ),
                   border: rightClickEntry.value == entry
                       ? Border.all(
-                          color: MyTheme.button,
+                          color: MyTheme.accent,
                           width: 1.0,
                         )
                       : null,

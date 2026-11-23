@@ -29,6 +29,8 @@ import 'package:window_manager/window_manager.dart';
 import 'package:window_size/window_size.dart' as window_size;
 
 import '../consts.dart';
+import 'nixdesk_tema.dart';
+export 'nixdesk_tema.dart';
 import 'common/widgets/overlay.dart';
 import 'mobile/pages/file_manager_page.dart';
 import 'mobile/pages/remote_page.dart';
@@ -167,10 +169,10 @@ class ColorThemeExtension extends ThemeExtension<ColorThemeExtension> {
   final Color? divider;
 
   static final light = ColorThemeExtension(
-    border: Color(0xFFCCCCCC),
-    border2: Color(0xFFBBBBBB),
+    border: NixColor.bordeClaro,
+    border2: Color(0xFFB3BDCD),
     border3: Colors.black26,
-    highlight: Color(0xFFE5E5E5),
+    highlight: NixColor.brumaAlta,
     drag_indicator: Colors.grey[800],
     shadow: Colors.black,
     errorBannerBg: Color(0xFFFDEEEB),
@@ -181,13 +183,13 @@ class ColorThemeExtension extends ThemeExtension<ColorThemeExtension> {
   );
 
   static final dark = ColorThemeExtension(
-    border: Color(0xFF555555),
-    border2: Color(0xFFE5E5E5),
+    border: NixColor.bordeFuerte,
+    border2: NixColor.niebla,
     border3: Colors.white24,
-    highlight: Color(0xFF3F3F3F),
+    highlight: NixColor.nocheAlta,
     drag_indicator: Colors.grey,
     shadow: Colors.grey,
-    errorBannerBg: Color(0xFF470F2D),
+    errorBannerBg: Color(0xFF4A1524),
     me: Colors.greenAccent,
     toastBg: Colors.white.withOpacity(0.6),
     toastText: Colors.black,
@@ -248,18 +250,26 @@ class ColorThemeExtension extends ThemeExtension<ColorThemeExtension> {
 class MyTheme {
   MyTheme._();
 
-  static const Color grayBg = Color(0xFFEFEFF2);
-  static const Color accent = Color(0xFF0071FF);
-  static const Color accent50 = Color(0x770071FF);
-  static const Color accent80 = Color(0xAA0071FF);
-  static const Color canvasColor = Color(0xFF212121);
-  static const Color border = Color(0xFFCCCCCC);
-  static const Color idColor = Color(0xFF00B6F0);
+  // Los colores salen de NixColor (nixdesk_tema.dart).
+  static const Color grayBg = NixColor.bruma;
+  // Acento de marca: trazos, íconos e indicadores, y relleno de los botones
+  // principales con texto `onAccent`. Como texto solo sirve sobre fondo oscuro;
+  // para texto que depende del tema usar NixColor.acento(context).
+  static const Color accent = NixColor.naranja;
+  static const Color accent50 = Color(0x77F38A20);
+  static const Color accent80 = Color(0xAAF38A20);
+  static const Color accentHover = NixColor.naranjaClaro;
+  static const Color onAccent = NixColor.tinta;
+  static const Color canvasColor = NixColor.noche;
+  static const Color border = NixColor.bordeClaro;
+  static const Color idColor = NixColor.naranja;
   static const Color darkGray = Color.fromARGB(255, 148, 148, 148);
   static const Color cmIdColor = Color(0xFF21790B);
   static const Color dark = Colors.black87;
-  static const Color button = Color(0xFF2C8CFF);
-  static const Color hoverBorder = Color(0xFF999999);
+  // Relleno para contenido blanco (barra de la sesión remota, menús): 5,4:1.
+  static const Color button = NixColor.naranjaProfundo;
+  static const Color buttonHover = NixColor.naranjaHondo;
+  static const Color hoverBorder = NixColor.naranja;
 
   // ListTile
   static const ListTileThemeData listTileTheme = ListTileThemeData(
@@ -283,6 +293,17 @@ class MyTheme {
   // Checkbox
   static const CheckboxThemeData checkboxTheme = CheckboxThemeData(
     splashRadius: 0,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.all(
+        Radius.circular(5),
+      ),
+    ),
+  );
+
+  // En el tema oscuro la casilla marcada es naranja pleno: la tilde va en tinta.
+  static const CheckboxThemeData checkboxThemeDark = CheckboxThemeData(
+    splashRadius: 0,
+    checkColor: MaterialStatePropertyAll(onAccent),
     shape: RoundedRectangleBorder(
       borderRadius: BorderRadius.all(
         Radius.circular(5),
@@ -373,9 +394,10 @@ class MyTheme {
     // https://stackoverflow.com/questions/77537315/after-upgrading-to-flutter-3-16-the-app-bar-background-color-button-size-and
     useMaterial3: false,
     brightness: Brightness.light,
-    hoverColor: Color.fromARGB(255, 224, 224, 224),
-    scaffoldBackgroundColor: Colors.white,
-    dialogBackgroundColor: Colors.white,
+    hoverColor: NixColor.brumaAlta,
+    scaffoldBackgroundColor: NixColor.papel,
+    dialogBackgroundColor: NixColor.papel,
+    dividerColor: NixColor.bordeClaro,
     appBarTheme: AppBarTheme(
       shadowColor: Colors.transparent,
     ),
@@ -401,14 +423,15 @@ class MyTheme {
           )
         : null,
     textTheme: const TextTheme(
-        titleLarge: TextStyle(fontSize: 19, color: Colors.black87),
-        titleSmall: TextStyle(fontSize: 14, color: Colors.black87),
-        bodySmall: TextStyle(fontSize: 12, color: Colors.black87, height: 1.25),
+        titleLarge: TextStyle(fontSize: 19, color: NixColor.tinta),
+        titleSmall: TextStyle(fontSize: 14, color: NixColor.tinta),
+        bodySmall: TextStyle(fontSize: 12, color: NixColor.tinta, height: 1.25),
         bodyMedium:
-            TextStyle(fontSize: 14, color: Colors.black87, height: 1.25),
-        labelLarge: TextStyle(fontSize: 16.0, color: MyTheme.accent80)),
+            TextStyle(fontSize: 14, color: NixColor.tinta, height: 1.25),
+        labelLarge:
+            TextStyle(fontSize: 16.0, color: NixColor.naranjaProfundo)),
     cardColor: grayBg,
-    hintColor: Color(0xFFAAAAAA),
+    hintColor: Color(0xFF6B778C),
     visualDensity: VisualDensity.adaptivePlatformDensity,
     tabBarTheme: const TabBarTheme(
       labelColor: Colors.black87,
@@ -430,6 +453,7 @@ class MyTheme {
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         backgroundColor: MyTheme.accent,
+        foregroundColor: MyTheme.onAccent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8.0),
         ),
@@ -438,7 +462,8 @@ class MyTheme {
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         backgroundColor: grayBg,
-        foregroundColor: Colors.black87,
+        foregroundColor: NixColor.tinta,
+        side: BorderSide(color: NixColor.bordeClaro),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8.0),
         ),
@@ -452,13 +477,21 @@ class MyTheme {
         style:
             MenuStyle(backgroundColor: MaterialStatePropertyAll(Colors.white))),
     colorScheme: ColorScheme.light(
-        primary: Colors.blue, secondary: accent, background: grayBg),
+        primary: NixColor.naranjaProfundo,
+        onPrimary: Colors.white,
+        secondary: NixColor.naranjaProfundo,
+        onSecondary: Colors.white,
+        onSurface: NixColor.tinta,
+        onBackground: NixColor.tinta,
+        background: grayBg),
+    progressIndicatorTheme:
+        ProgressIndicatorThemeData(color: NixColor.naranjaProfundo),
     popupMenuTheme: PopupMenuThemeData(
         color: Colors.white,
         shape: RoundedRectangleBorder(
           side: BorderSide(
               color: (isDesktop || isWebDesktop)
-                  ? Color(0xFFECECEC)
+                  ? NixColor.brumaAlta
                   : Colors.transparent),
           borderRadius: BorderRadius.all(Radius.circular(8.0)),
         )),
@@ -471,9 +504,11 @@ class MyTheme {
   static ThemeData darkTheme = ThemeData(
     useMaterial3: false,
     brightness: Brightness.dark,
-    hoverColor: Color.fromARGB(255, 45, 46, 53),
-    scaffoldBackgroundColor: Color(0xFF18191E),
-    dialogBackgroundColor: Color(0xFF18191E),
+    hoverColor: NixColor.nocheAlta,
+    scaffoldBackgroundColor: NixColor.carbon,
+    dialogBackgroundColor: NixColor.carbon,
+    canvasColor: NixColor.nocheAlta,
+    dividerColor: NixColor.borde,
     appBarTheme: AppBarTheme(
       shadowColor: Colors.transparent,
     ),
@@ -483,14 +518,14 @@ class MyTheme {
         borderRadius: BorderRadius.circular(18.0),
         side: BorderSide(
           width: 1,
-          color: Color(0xFF24252B),
+          color: NixColor.borde,
         ),
       ),
     ),
     scrollbarTheme: scrollbarThemeDark,
     inputDecorationTheme: (isDesktop || isWebDesktop)
         ? InputDecorationTheme(
-            fillColor: Color(0xFF24252B),
+            fillColor: NixColor.noche,
             filled: true,
             isDense: true,
             border: OutlineInputBorder(
@@ -506,10 +541,11 @@ class MyTheme {
       labelLarge: TextStyle(
         fontSize: 16.0,
         fontWeight: FontWeight.bold,
-        color: accent80,
+        color: accent,
       ),
     ),
-    cardColor: Color(0xFF24252B),
+    cardColor: NixColor.noche,
+    hintColor: NixColor.nieblaMedia,
     visualDensity: VisualDensity.adaptivePlatformDensity,
     tabBarTheme: const TabBarTheme(
       labelColor: Colors.white70,
@@ -533,7 +569,7 @@ class MyTheme {
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         backgroundColor: MyTheme.accent,
-        foregroundColor: Colors.white,
+        foregroundColor: MyTheme.onAccent,
         disabledForegroundColor: Colors.white70,
         disabledBackgroundColor: Colors.white10,
         shape: RoundedRectangleBorder(
@@ -543,8 +579,8 @@ class MyTheme {
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
-        backgroundColor: Color(0xFF24252B),
-        side: BorderSide(color: Colors.white12, width: 0.5),
+        backgroundColor: NixColor.noche,
+        side: BorderSide(color: NixColor.borde, width: 1),
         disabledForegroundColor: Colors.white70,
         foregroundColor: Colors.white70,
         shape: RoundedRectangleBorder(
@@ -554,21 +590,26 @@ class MyTheme {
     ),
     switchTheme: switchTheme(),
     radioTheme: radioTheme(),
-    checkboxTheme: checkboxTheme,
+    checkboxTheme: checkboxThemeDark,
     listTileTheme: listTileTheme,
     menuBarTheme: MenuBarThemeData(
         style: MenuStyle(
-            backgroundColor: MaterialStatePropertyAll(Color(0xFF121212)))),
+            backgroundColor: MaterialStatePropertyAll(NixColor.carbon))),
     colorScheme: ColorScheme.dark(
-      primary: Colors.blue,
+      primary: accent,
+      onPrimary: onAccent,
       secondary: accent,
-      background: Color(0xFF24252B),
+      onSecondary: onAccent,
+      surface: NixColor.noche,
+      background: NixColor.noche,
     ),
+    progressIndicatorTheme: ProgressIndicatorThemeData(color: accent),
     popupMenuTheme: PopupMenuThemeData(
+        color: NixColor.noche,
         shape: RoundedRectangleBorder(
-      side: BorderSide(color: Colors.white24),
-      borderRadius: BorderRadius.all(Radius.circular(8.0)),
-    )),
+          side: BorderSide(color: NixColor.borde),
+          borderRadius: BorderRadius.all(Radius.circular(8.0)),
+        )),
   ).copyWith(
     extensions: <ThemeExtension<dynamic>>[
       ColorThemeExtension.dark,
@@ -1149,8 +1190,8 @@ Widget createDialogContent(String text) {
     }
     spans.add(TextSpan(
       text: match.group(0) ?? '',
-      style: const TextStyle(
-        color: Colors.blue,
+      style: TextStyle(
+        color: Get.isDarkMode ? NixColor.naranja : NixColor.naranjaProfundo,
         decoration: TextDecoration.underline,
       ),
       recognizer: TapGestureRecognizer()
@@ -3321,7 +3362,7 @@ Widget buildErrorBanner(BuildContext context,
                     },
                     child: Text(
                       translate("Retry"),
-                      style: TextStyle(color: MyTheme.accent),
+                      style: TextStyle(color: NixColor.acento(context)),
                     )).marginSymmetric(horizontal: 5),
               FittedBox(
                 child: InkWell(
