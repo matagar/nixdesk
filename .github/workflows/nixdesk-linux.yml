@@ -22,6 +22,12 @@ env:
   NIXDESK_PACKAGE_NAME: "nixdesk"
   NIXDESK_RENDEZVOUS_SERVER: "nixdesk.matagar.com.ar"
   NIXDESK_RS_PUB_KEY: "8Xn4R7JT5qomD0T+gaTlBWCDxoCU1e2D41UxqUBaYpA="
+  # Servidor de API propio (cuentas, libreta de direcciones), con esquema y sin
+  # barra final, por ejemplo "https://api.ejemplo.com". Se toma de la variable
+  # NIXDESK_API_SERVER del repositorio (Settings > Secrets and variables >
+  # Actions > Variables). Vacío: la aplicación no usa ningún servidor de API
+  # (tampoco los de RustDesk) y no muestra el inicio de sesión de cuenta.
+  NIXDESK_API_SERVER: ${{ vars.NIXDESK_API_SERVER || '' }}
 
 jobs:
   generate-bridge:
@@ -77,6 +83,27 @@ jobs:
           grep -nF "pub const RENDEZVOUS_SERVERS: &[&str] = &[\"${NIXDESK_RENDEZVOUS_SERVER}\"];" "$f"
           grep -nF "pub const RS_PUB_KEY: &str = \"${NIXDESK_RS_PUB_KEY}\";" "$f"
           git -C libs/hbb_common diff --stat
+
+      # El servidor de API es una constante de src/nixdesk.rs. Vacío es un valor
+      # válido (sin servidor de API). Si la línea ya no coincide, el paso falla.
+      - name: Aplicar el servidor de API de NixDesk
+        shell: bash
+        run: |
+          f=src/nixdesk.rs
+          api="${NIXDESK_API_SERVER%/}"
+          case "$api" in
+            ""|http://*|https://*) ;;
+            *) echo "NIXDESK_API_SERVER tiene que empezar con http:// o https://"; exit 1 ;;
+          esac
+          case "$api" in
+            *'"'*|*'|'*|*'\'*|*'&'*|*' '*) echo "NIXDESK_API_SERVER tiene caracteres no admitidos"; exit 1 ;;
+          esac
+          case "$api" in
+            *rustdesk.com*) echo "NIXDESK_API_SERVER no puede ser un servidor de RustDesk"; exit 1 ;;
+          esac
+          sed -i -E "s|^(pub const API_SERVER: &str = \")[^\"]*(\";)|\1${api}\2|" "$f"
+          grep -nF "pub const API_SERVER: &str = \"${api}\";" "$f"
+          if [ -z "$api" ]; then echo "Sin servidor de API"; else echo "Servidor de API: $api"; fi
 
       - name: Set Swap Space
         uses: pierotofy/set-swap-space@49819abfb41bd9b44fb781159c033dba90353a7c # v1.0
@@ -275,6 +302,16 @@ jobs:
             echo "El binario conserva el servidor de RustDesk"
             exit 1
           fi
+          if grep -q -a -F "admin.rustdesk.com" "$so"; then
+            echo "El binario conserva el servidor de API de RustDesk"
+            exit 1
+          fi
+          if [ -n "${NIXDESK_API_SERVER}" ]; then
+            grep -c -a -F "${NIXDESK_API_SERVER%/}" "$so"
+          fi
+          # Logotipo propio para el panel izquierdo de la pantalla principal.
+          test -f "extraido/usr/share/${NIXDESK_PACKAGE_NAME}/data/flutter_assets/assets/logo_dark.png"
+          test -f "extraido/usr/share/${NIXDESK_PACKAGE_NAME}/data/flutter_assets/assets/logo_light.png"
           sudo rm -rf extraido contenido.txt
 
       - name: Upload deb

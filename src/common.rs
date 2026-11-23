@@ -1311,7 +1311,9 @@ fn get_api_server_(api: String, custom: String) -> String {
         return api.to_owned();
     }
     let s0 = get_custom_rendezvous_server(custom);
-    if !s0.is_empty() {
+    // Con el servidor de fábrica de NixDesk no se deduce un servidor de API a partir
+    // del servidor de encuentro: el de API es el de `nixdesk::API_SERVER` o ninguno.
+    if !s0.is_empty() && !crate::nixdesk::es_servidor_de_fabrica(&s0) {
         let s = crate::increase_port(&s0, -2);
         if s == s0 {
             let s = if hbb_common::is_ipv6_str(&s) && !s.starts_with('[') {
@@ -1324,7 +1326,8 @@ fn get_api_server_(api: String, custom: String) -> String {
             return format!("http://{}", s);
         }
     }
-    "https://admin.rustdesk.com".to_owned()
+    // NixDesk no usa nunca el servidor de API de RustDesk.
+    crate::nixdesk::API_SERVER.to_owned()
 }
 
 #[inline]
@@ -2523,6 +2526,7 @@ pub fn rustdesk_interval(i: Interval) -> ThrottledInterval {
 }
 
 pub fn load_custom_client() {
+    crate::nixdesk::aplicar_ajustes_de_fabrica();
     #[cfg(debug_assertions)]
     if let Ok(data) = std::fs::read_to_string("./custom.txt") {
         read_custom_client(data.trim());
