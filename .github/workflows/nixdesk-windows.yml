@@ -29,6 +29,13 @@ env:
   # Actions > Variables). Vacío: la aplicación no usa ningún servidor de API
   # (tampoco los de RustDesk) y no muestra el inicio de sesión de cuenta.
   NIXDESK_API_SERVER: ${{ vars.NIXDESK_API_SERVER || '' }}
+  # Permiso de conexión firmado por el panel (src/nixdesk_permiso.rs). La clave es
+  # la pública con que el servidor de API firma (GET /api/nixdesk/clave-publica; no
+  # es un secreto) y el modo es lo que hace el equipo controlado: no, aviso o
+  # exigir. Salen de las variables NIXDESK_PERMISO_PUB_KEY y NIXDESK_PERMISO_MODO
+  # del repositorio. Sin clave, los equipos no miran permisos.
+  NIXDESK_PERMISO_PUB_KEY: ${{ vars.NIXDESK_PERMISO_PUB_KEY || '' }}
+  NIXDESK_PERMISO_MODO: ${{ vars.NIXDESK_PERMISO_MODO || 'aviso' }}
 
 jobs:
   generate-bridge:
@@ -107,6 +114,13 @@ jobs:
           grep -nF "pub const API_SERVER: &str = \"${api}\";" "$f"
           if [ -z "$api" ]; then echo "Sin servidor de API"; else echo "Servidor de API: $api"; fi
 
+      # Clave pública y modo del permiso de conexión: constantes de src/nixdesk.rs.
+      # El guion valida los valores (modo dentro de los tres, clave en base64 de
+      # 32 bytes) y controla que el campo nixdesk_permiso esté en el LoginRequest.
+      - name: Aplicar el permiso de conexión de NixDesk
+        shell: bash
+        run: bash .github/scripts/nixdesk-aplicar-permiso.sh
+
       - name: Restore bridge files
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -150,6 +164,12 @@ jobs:
           toolchain: ${{ env.SCITER_RUST_VERSION }}
           targets: ${{ env.TARGET }}
           components: "rustfmt"
+
+      # Antes de la compilación larga: las pruebas de la verificación del permiso,
+      # en un crate mínimo con las mismas versiones del Cargo.lock.
+      - name: Probar la verificación del permiso de conexión
+        shell: bash
+        run: bash .github/scripts/nixdesk-probar-permiso.sh
 
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
@@ -231,6 +251,20 @@ jobs:
         run: |
           mv ./rustdesk/rustdesk.exe "./rustdesk/${NIXDESK_EXE_NAME}.exe"
           ls -l ./rustdesk
+
+      # Control de lo compilado: el servidor de API y la clave con que el equipo
+      # verifica los permisos de conexión tienen que estar dentro de la biblioteca.
+      - name: Verificar lo compilado
+        shell: bash
+        run: |
+          dll=./rustdesk/librustdesk.dll
+          ls -l "$dll"
+          if [ -n "${NIXDESK_API_SERVER}" ]; then
+            grep -c -a -F "${NIXDESK_API_SERVER%/}" "$dll"
+          fi
+          if [ -n "${NIXDESK_PERMISO_PUB_KEY}" ]; then
+            grep -c -a -F "${NIXDESK_PERMISO_PUB_KEY}" "$dll"
+          fi
 
       - name: find Runner.res
         # Windows: find Runner.res (compiled from ./flutter/windows/runner/Runner.rc), copy to ./Runner.res

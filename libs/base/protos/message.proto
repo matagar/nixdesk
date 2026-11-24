@@ -86,6 +86,9 @@ message LoginRequest {
   string avatar = 17;
   bytes trusted_device_v2_token = 18;
   bool trusted_device_v2_supported = 19;
+  // NixDesk: permiso de conexión firmado por el panel (src/nixdesk_permiso.rs).
+  // Un RustDesk oficial no conoce el campo y lo ignora.
+  string nixdesk_permiso = 1001;
 }
 
 message Terminal {

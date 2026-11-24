@@ -28,6 +28,13 @@ env:
   # Actions > Variables). Vacío: la aplicación no usa ningún servidor de API
   # (tampoco los de RustDesk) y no muestra el inicio de sesión de cuenta.
   NIXDESK_API_SERVER: ${{ vars.NIXDESK_API_SERVER || '' }}
+  # Permiso de conexión firmado por el panel (src/nixdesk_permiso.rs). La clave es
+  # la pública con que el servidor de API firma (GET /api/nixdesk/clave-publica; no
+  # es un secreto) y el modo es lo que hace el equipo controlado: no, aviso o
+  # exigir. Salen de las variables NIXDESK_PERMISO_PUB_KEY y NIXDESK_PERMISO_MODO
+  # del repositorio. Sin clave, los equipos no miran permisos.
+  NIXDESK_PERMISO_PUB_KEY: ${{ vars.NIXDESK_PERMISO_PUB_KEY || '' }}
+  NIXDESK_PERMISO_MODO: ${{ vars.NIXDESK_PERMISO_MODO || 'aviso' }}
 
 jobs:
   generate-bridge:
@@ -105,6 +112,13 @@ jobs:
           grep -nF "pub const API_SERVER: &str = \"${api}\";" "$f"
           if [ -z "$api" ]; then echo "Sin servidor de API"; else echo "Servidor de API: $api"; fi
 
+      # Clave pública y modo del permiso de conexión: constantes de src/nixdesk.rs.
+      # El guion valida los valores (modo dentro de los tres, clave en base64 de
+      # 32 bytes) y controla que el campo nixdesk_permiso esté en el LoginRequest.
+      - name: Aplicar el permiso de conexión de NixDesk
+        shell: bash
+        run: bash .github/scripts/nixdesk-aplicar-permiso.sh
+
       - name: Set Swap Space
         uses: pierotofy/set-swap-space@49819abfb41bd9b44fb781159c033dba90353a7c # v1.0
         with:
@@ -121,6 +135,12 @@ jobs:
           toolchain: ${{ env.RUST_VERSION }}
           targets: ${{ env.TARGET }}
           components: "rustfmt"
+
+      # Antes de la compilación larga: las pruebas de la verificación del permiso,
+      # en un crate mínimo con las mismas versiones del Cargo.lock.
+      - name: Probar la verificación del permiso de conexión
+        shell: bash
+        run: bash .github/scripts/nixdesk-probar-permiso.sh
 
       - name: Save Rust toolchain version
         run: |
@@ -308,6 +328,10 @@ jobs:
           fi
           if [ -n "${NIXDESK_API_SERVER}" ]; then
             grep -c -a -F "${NIXDESK_API_SERVER%/}" "$so"
+          fi
+          # La clave con que el equipo verifica los permisos de conexión.
+          if [ -n "${NIXDESK_PERMISO_PUB_KEY}" ]; then
+            grep -c -a -F "${NIXDESK_PERMISO_PUB_KEY}" "$so"
           fi
           # Logotipo propio para el panel izquierdo de la pantalla principal.
           test -f "extraido/usr/share/${NIXDESK_PACKAGE_NAME}/data/flutter_assets/assets/logo_dark.png"
