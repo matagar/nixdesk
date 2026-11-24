@@ -489,6 +489,17 @@ impl Client {
                 (check_port(other_server, RENDEZVOUS_PORT), Vec::new(), true)
             }
         };
+        // NixDesk: el token de la sesión es del servidor de API, no del de encuentro.
+        // Con un token, el cliente espera que el servidor de encuentro abra un
+        // intercambio de claves (`secure_tcp`) antes del pedido; el hbbs libre no lo
+        // hace y la conexión falla al vencer `READ_TIMEOUT` (18 s). Al servidor de
+        // fábrica no se le manda: sin token el pedido va como en un cliente sin
+        // sesión iniciada. Con otro servidor configurado queda como en RustDesk.
+        let token = if crate::nixdesk::es_servidor_de_fabrica(&rendezvous_server) {
+            ""
+        } else {
+            token
+        };
 
         // Same relay gate as the v6 socket below: under any forced relay the v6 punch cannot
         // be used, so probing v6 reachability is wasted work on every such connection.
