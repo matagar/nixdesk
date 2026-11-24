@@ -20,6 +20,12 @@ use hbb_common::config;
 /// consulta ninguno (tampoco los de RustDesk) y no muestra el inicio de sesión.
 pub const API_SERVER: &str = "";
 
+/// Copia de `API_SERVER` que queda entera dentro del binario. El compilador puede
+/// partir una constante corta en valores inmediatos (pasa en macOS x86_64) y
+/// entonces el control del flujo, que busca el texto en el binario, no la encuentra.
+#[used]
+static API_SERVER_EN_EL_BINARIO: &str = API_SERVER;
+
 fn servidor_de_fabrica() -> &'static str {
     config::RENDEZVOUS_SERVERS.first().copied().unwrap_or("")
 }
