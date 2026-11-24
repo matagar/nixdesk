@@ -359,6 +359,12 @@ def get_features(args):
 # estar instalados y con el servicio activo a la vez.
 LINUX_PACKAGE_NAME = 'nixdesk'
 
+# NixDesk: nombre del paquete de aplicación de macOS (PRODUCT_NAME en
+# flutter/macos/Runner/Configs/AppInfo.xcconfig). Tiene que ser igual al nombre de la
+# aplicación: la instalación, el servicio y la búsqueda de procesos usan
+# /Applications/<nombre>.app/Contents/MacOS/<nombre> (src/platform/macos.rs).
+MACOS_APP_NAME = 'NixDesk'
+
 
 def generate_control_file(version):
     control_file_path = "../res/DEBIAN/control"
@@ -949,12 +955,11 @@ def build_flutter_dmg(version, features):
     mac_arch = 'arm64' if platform.machine().lower() in ('arm64', 'aarch64') else 'x86_64'
     system2(
         f'FLUTTER_XCODE_ARCHS={mac_arch} FLUTTER_XCODE_ONLY_ACTIVE_ARCH=YES flutter build macos --release')
-    system2('cp -rf ../target/release/service ./build/macos/Build/Products/Release/RustDesk.app/Contents/MacOS/')
-    '''
-    system2(
-        "create-dmg --volname \"RustDesk Installer\" --window-pos 200 120 --window-size 800 400 --icon-size 100 --app-drop-link 600 185 --icon RustDesk.app 200 190 --hide-extension RustDesk.app rustdesk.dmg ./build/macos/Build/Products/Release/RustDesk.app")
-    os.rename("rustdesk.dmg", f"../rustdesk-{version}.dmg")
-    '''
+    app = f'./build/macos/Build/Products/Release/{MACOS_APP_NAME}.app'
+    if not os.path.isfile(f'{app}/Contents/MacOS/{MACOS_APP_NAME}'):
+        raise Exception(f'the flutter bundle has no executable named {MACOS_APP_NAME}')
+    system2(f'cp -rf ../target/release/service {app}/Contents/MacOS/')
+    # El .dmg lo arma el flujo de compilación (.github/workflows/nixdesk-macos.yml).
     os.chdir("..")
 
 

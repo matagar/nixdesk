@@ -1,0 +1,372 @@
+name: NixDesk macOS
+
+# Compilación recortada de NixDesk: un .dmg por arquitectura (Apple Silicon e
+# Intel), sin firma de Apple ni notarización (no hay cuenta de desarrollador),
+# sin publicar releases ni metadatos de actualización.
+# Los pasos salen del trabajo `build-for-macOS` de flutter-build.yml
+# (mismas versiones fijadas, mismos ejecutores y mismos parches).
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  MAC_RUST_VERSION: "1.81" # igual que flutter-build.yml
+  FLUTTER_VERSION: "3.24.5"
+  # Apple Silicon compila con Flutter 3.44 (igual que flutter-build.yml): el motor
+  # de 3.24.5 se cae ahí. Intel sigue en FLUTTER_VERSION.
+  FLUTTER_MACOS_ARM_VERSION: "3.44.9"
+  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+  VCPKG_COMMIT_ID: "9e593bb18ea69cc5095e012465dcd675a822ed0d"
+  VERSION: "1.5.3"
+  # Marca y servidor propio. La clave es la pública del servidor (no es un secreto).
+  NIXDESK_APP_NAME: "NixDesk"
+  NIXDESK_PACKAGE_NAME: "nixdesk"
+  # Identificador de paquete (PRODUCT_BUNDLE_IDENTIFIER en flutter/macos). Acá solo
+  # se usa para controlar el resultado.
+  NIXDESK_BUNDLE_ID: "org.nixdesk.nixdesk"
+  NIXDESK_RENDEZVOUS_SERVER: "nixdesk.matagar.com.ar"
+  NIXDESK_RS_PUB_KEY: "8Xn4R7JT5qomD0T+gaTlBWCDxoCU1e2D41UxqUBaYpA="
+  # Servidor de API propio (cuentas, libreta de direcciones), con esquema y sin
+  # barra final, por ejemplo "https://api.ejemplo.com". Se toma de la variable
+  # NIXDESK_API_SERVER del repositorio (Settings > Secrets and variables >
+  # Actions > Variables). Vacío: la aplicación no usa ningún servidor de API
+  # (tampoco los de RustDesk) y no muestra el inicio de sesión de cuenta.
+  NIXDESK_API_SERVER: ${{ vars.NIXDESK_API_SERVER || '' }}
+
+jobs:
+  generate-bridge:
+    uses: ./.github/workflows/bridge.yml
+
+  build-nixdesk-macos:
+    name: ${{ matrix.job.target }}
+    needs: [generate-bridge]
+    runs-on: ${{ matrix.job.os }}
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        job:
+          - {
+              target: x86_64-apple-darwin,
+              os: macos-26-intel,
+              extra-build-args: "",
+              arch: x86_64,
+              mach-arch: x86_64,
+              vcpkg-triplet: x64-osx,
+            }
+          - {
+              target: aarch64-apple-darwin,
+              os: macos-26,
+              extra-build-args: "--screencapturekit",
+              arch: aarch64,
+              mach-arch: arm64,
+              vcpkg-triplet: arm64-osx,
+            }
+    env:
+      ARCH: ${{ matrix.job.arch }}
+      MACH_ARCH: ${{ matrix.job.mach-arch }}
+      APP: ./flutter/build/macos/Build/Products/Release/NixDesk.app
+    steps:
+      - name: Export GitHub Actions cache environment variables
+        uses: actions/github-script@d7906e4ad0b1822421a7e6a35d5ca353c962f410 # v6
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      - name: Checkout source code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          submodules: recursive
+
+      # El sed de macOS (BSD) no acepta `sed -i` sin sufijo ni `\s`. Los parches de
+      # abajo son los mismos de los flujos de Windows y Linux y usan GNU sed (`gsed`).
+      # No se pone primero en el PATH: los guiones de Xcode y CocoaPods esperan el
+      # sed del sistema.
+      - name: Instalar GNU sed
+        run: |
+          brew install gnu-sed
+          gsed --version | head -n 1
+
+      # El nombre de la aplicación, el servidor de encuentro por defecto y su clave
+      # pública son constantes de libs/hbb_common (submódulo de rustdesk/hbb_common).
+      # Se cambian acá, sobre la copia descargada, para no mantener otro fork.
+      # Si el submódulo cambia y alguna línea ya no coincide, el paso falla.
+      - name: Aplicar marca y servidor de NixDesk en hbb_common
+        shell: bash
+        run: |
+          f=libs/hbb_common/src/config.rs
+          gsed -i -E \
+            -e "s|^(\s*pub static ref APP_NAME: RwLock<String> = RwLock::new\(\")RustDesk(\"\.to_owned\(\)\);)|\1${NIXDESK_APP_NAME}\2|" \
+            -e "s|^(pub const RENDEZVOUS_SERVERS: &\[&str\] = &\[)\"[^]]*\"(\];)|\1\"${NIXDESK_RENDEZVOUS_SERVER}\"\2|" \
+            -e "s|^(pub const RS_PUB_KEY: &str = \")[^\"]*(\";)|\1${NIXDESK_RS_PUB_KEY}\2|" \
+            "$f"
+          grep -nF "pub static ref APP_NAME: RwLock<String> = RwLock::new(\"${NIXDESK_APP_NAME}\".to_owned());" "$f"
+          grep -nF "pub const RENDEZVOUS_SERVERS: &[&str] = &[\"${NIXDESK_RENDEZVOUS_SERVER}\"];" "$f"
+          grep -nF "pub const RS_PUB_KEY: &str = \"${NIXDESK_RS_PUB_KEY}\";" "$f"
+          git -C libs/hbb_common diff --stat
+
+      # El servidor de API es una constante de src/nixdesk.rs. Vacío es un valor
+      # válido (sin servidor de API). Si la línea ya no coincide, el paso falla.
+      - name: Aplicar el servidor de API de NixDesk
+        shell: bash
+        run: |
+          f=src/nixdesk.rs
+          api="${NIXDESK_API_SERVER%/}"
+          case "$api" in
+            ""|http://*|https://*) ;;
+            *) echo "NIXDESK_API_SERVER tiene que empezar con http:// o https://"; exit 1 ;;
+          esac
+          case "$api" in
+            *'"'*|*'|'*|*'\'*|*'&'*|*' '*) echo "NIXDESK_API_SERVER tiene caracteres no admitidos"; exit 1 ;;
+          esac
+          case "$api" in
+            *rustdesk.com*) echo "NIXDESK_API_SERVER no puede ser un servidor de RustDesk"; exit 1 ;;
+          esac
+          gsed -i -E "s|^(pub const API_SERVER: &str = \")[^\"]*(\";)|\1${api}\2|" "$f"
+          grep -nF "pub const API_SERVER: &str = \"${api}\";" "$f"
+          if [ -z "$api" ]; then echo "Sin servidor de API"; else echo "Servidor de API: $api"; fi
+
+      # El nombre del .app, el identificador de paquete y el esquema de URL están
+      # en el código del fork (flutter/macos y build.py). Si no coinciden con los de
+      # este flujo, se corta antes de compilar.
+      - name: Controlar la marca en flutter/macos
+        shell: bash
+        run: |
+          grep -nxF "PRODUCT_NAME = ${NIXDESK_APP_NAME}" flutter/macos/Runner/Configs/AppInfo.xcconfig
+          grep -nxF "PRODUCT_BUNDLE_IDENTIFIER = ${NIXDESK_BUNDLE_ID}" flutter/macos/Runner/Configs/AppInfo.xcconfig
+          test "$(grep -cF "PRODUCT_BUNDLE_IDENTIFIER = ${NIXDESK_BUNDLE_ID};" flutter/macos/Runner.xcodeproj/project.pbxproj)" = "3"
+          if grep -n "PRODUCT_BUNDLE_IDENTIFIER" flutter/macos/Runner.xcodeproj/project.pbxproj | grep -vF "${NIXDESK_BUNDLE_ID};"; then
+            echo "project.pbxproj tiene otro identificador de paquete"
+            exit 1
+          fi
+          grep -nF "<string>${NIXDESK_PACKAGE_NAME}</string>" flutter/macos/Runner/Info.plist
+          grep -nxF "MACOS_APP_NAME = '${NIXDESK_APP_NAME}'" build.py
+
+      - name: Install build runtime
+        run: |
+          brew install llvm create-dmg
+          # pkg-config is handled in a separate step, because it may be already installed by `macos-latest`(14.7.1) runner
+          if command -v pkg-config &>/dev/null; then
+              echo "pkg-config is already installed"
+          else
+              brew install pkg-config
+          fi
+
+      - name: Install NASM
+        run: |
+          # Install NASM 2.16.x from official release.
+          # Do NOT use `brew install nasm` which installs NASM 3.x.
+          # NASM 3.x is a complete rewrite with incompatible CLI options and removed features.
+          # aom and other multimedia libraries require NASM 2.x for x86/x86_64 assembly.
+          wget https://www.nasm.us/pub/nasm/releasebuilds/2.16.03/macosx/nasm-2.16.03-macosx.zip
+          unzip nasm-2.16.03-macosx.zip
+          sudo cp nasm-2.16.03/nasm /usr/local/bin/nasm
+          nasm --version
+
+      - name: Install flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: "stable"
+          flutter-version: ${{ matrix.job.arch == 'aarch64' && env.FLUTTER_MACOS_ARM_VERSION || env.FLUTTER_VERSION }}
+
+      - name: Keep CocoaPods for Flutter 3.44 (arm64)
+        # 3.44 turns on Swift Package Manager by default, which would migrate Runner.xcodeproj and
+        # move some plugins off CocoaPods; every plugin still ships a podspec.
+        if: ${{ matrix.job.arch == 'aarch64' }}
+        run: flutter config --no-enable-swift-package-manager
+
+      - name: Patch flutter
+        # Flutter 3.44 (arm64) already has this dropdown fix.
+        if: ${{ matrix.job.arch == 'x86_64' }}
+        run: |
+          cd $(dirname $(dirname $(which flutter)))
+          if [[ "3.24.5" == ${{env.FLUTTER_VERSION}} ]]; then
+            git apply ${{ github.workspace }}/.github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff
+          fi
+
+      - name: Workaround for flutter issue
+        shell: bash
+        run: |
+          cd "$(dirname "$(which flutter)")"
+          # https://github.com/flutter/flutter/issues/133533
+          sed -i -e 's/_setFramesEnabledState(false);/\/\/_setFramesEnabledState(false);/g' ../packages/flutter/lib/src/scheduler/binding.dart
+          grep -n '_setFramesEnabledState(false);' ../packages/flutter/lib/src/scheduler/binding.dart
+
+      - name: Patch RustDesk sources for Flutter 3.44 (arm64)
+        # The script uses GNU `sed -i`, which macOS's BSD sed rejects.
+        if: ${{ matrix.job.arch == 'aarch64' }}
+        shell: bash
+        run: |
+          export PATH="$(brew --prefix gnu-sed)/libexec/gnubin:$PATH"
+          bash .github/patches/apply_flutter_3.44_source_patches.sh
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
+        with:
+          toolchain: ${{ env.MAC_RUST_VERSION }}
+          targets: ${{ matrix.job.target }}
+          components: "rustfmt"
+
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          prefix-key: nixdesk-${{ matrix.job.os }}
+
+      - name: Restore bridge files
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          # arm64's *.freezed.dart must match the freezed it resolves under Flutter 3.44.
+          name: ${{ matrix.job.arch == 'aarch64' && 'bridge-artifact-flutter-3.44' || 'bridge-artifact' }}
+          path: ./
+
+      - name: Setup vcpkg with Github Actions binary cache
+        uses: lukka/run-vcpkg@b1a0dd252f06b9e25b3c022a9a03bd7a427fb6a2 # v11
+        with:
+          vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
+          doNotCache: false
+
+      - name: Install vcpkg dependencies
+        run: |
+          if ! $VCPKG_ROOT/vcpkg \
+            install \
+            --x-install-root="$VCPKG_ROOT/installed"; then
+            find "${VCPKG_ROOT}/" -name "*.log" | while read -r _1; do
+              echo "$_1:"
+              echo "======"
+              cat "$_1"
+              echo "======"
+              echo ""
+            done
+            exit 1
+          fi
+          head -n 100 "${VCPKG_ROOT}/buildtrees/ffmpeg/build-${{ matrix.job.vcpkg-triplet }}-rel-out.log" || true
+
+      - name: Show version information (Rust, cargo, Clang)
+        shell: bash
+        run: |
+          clang --version || true
+          rustup -V
+          rustup toolchain list
+          rustup default
+          cargo -V
+          rustc -V
+
+      - name: Build nixdesk
+        run: |
+          if [ "${{ matrix.job.target }}" = "aarch64-apple-darwin" ]; then
+            MIN_MACOS_VERSION="12.3"
+            sed -i -e "s/MACOSX_DEPLOYMENT_TARGET\=[0-9]*.[0-9]*/MACOSX_DEPLOYMENT_TARGET=${MIN_MACOS_VERSION}/" build.py
+            sed -i -e "s/platform :osx, '.*'/platform :osx, '${MIN_MACOS_VERSION}'/" flutter/macos/Podfile
+            sed -i -e "s/osx_minimum_system_version = \"[0-9]*.[0-9]*\"/osx_minimum_system_version = \"${MIN_MACOS_VERSION}\"/" Cargo.toml
+            sed -i -e "s/MACOSX_DEPLOYMENT_TARGET = [0-9]*.[0-9]*;/MACOSX_DEPLOYMENT_TARGET = ${MIN_MACOS_VERSION};/" flutter/macos/Runner.xcodeproj/project.pbxproj
+            echo "MACOSX_DEPLOYMENT_TARGET=${MIN_MACOS_VERSION}" >> "$GITHUB_ENV"
+          fi
+          ./build.py --flutter --hwcodec --unix-file-copy-paste ${{ matrix.job.extra-build-args }}
+
+      # Sin cuenta de desarrollador no hay firma de Apple ni notarización. Xcode deja
+      # el paquete con firma ad hoc, pero build.py copia `service` adentro después y
+      # el sello deja de valer. Se vuelve a firmar ad hoc, de adentro hacia afuera
+      # (Apple Silicon no ejecuta código sin firma). Sin `--options runtime`: con
+      # firma ad hoc la validación de bibliotecas del entorno reforzado rechaza las
+      # propias bibliotecas del paquete.
+      - name: Firmar ad hoc
+        shell: bash
+        run: |
+          test -d "$APP"
+          frameworks="$APP/Contents/Frameworks"
+          while IFS= read -r -d '' code; do
+            if file -b "$code" | grep -q 'Mach-O'; then
+              codesign --force --sign - "$code"
+            fi
+          done < <(find "$frameworks" -type f -print0)
+          while IFS= read -r -d '' framework; do
+            codesign --force --sign - "$framework"
+          done < <(find "$frameworks" -depth -type d -name '*.framework' -print0)
+          codesign --force --sign - "$APP/Contents/MacOS/service"
+          codesign --force --sign - --generate-entitlement-der \
+            --entitlements ./flutter/macos/Runner/Release.entitlements "$APP"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          codesign -dv --verbose=4 "$APP" 2>&1 | tee firma.txt
+          grep -xF "Identifier=${NIXDESK_BUNDLE_ID}" firma.txt
+          grep -xF "Signature=adhoc" firma.txt
+          codesign -d --entitlements :- "$APP" 2>/dev/null | grep -F "com.apple.security.device.audio-input"
+          rm -f firma.txt
+
+      # Control del paquete: nombre, identificador, esquema de URL, arquitectura, y el
+      # servidor y la clave propios dentro del binario.
+      - name: Verificar la aplicación
+        shell: bash
+        run: |
+          plist="$APP/Contents/Info.plist"
+          leer() { /usr/libexec/PlistBuddy -c "Print :$1" "$plist"; }
+          ls -l "$APP/Contents/MacOS" "$APP/Contents/Frameworks"
+          test "$(leer CFBundleIdentifier)" = "${NIXDESK_BUNDLE_ID}"
+          test "$(leer CFBundleName)" = "${NIXDESK_APP_NAME}"
+          test "$(leer CFBundleExecutable)" = "${NIXDESK_APP_NAME}"
+          test "$(leer CFBundleShortVersionString)" = "${VERSION}"
+          test "$(leer CFBundleURLTypes:0:CFBundleURLSchemes:0)" = "${NIXDESK_PACKAGE_NAME}"
+          echo "Versión mínima de macOS: $(leer LSMinimumSystemVersion)"
+          # El ejecutable se llama como la aplicación: los LaunchAgent y LaunchDaemon
+          # apuntan a /Applications/NixDesk.app/Contents/MacOS/NixDesk y .../service.
+          test -x "$APP/Contents/MacOS/${NIXDESK_APP_NAME}"
+          test -x "$APP/Contents/MacOS/service"
+          if find "$APP" -iname '*rustdesk*' | grep -v '/Contents/Frameworks/liblibrustdesk.dylib$'; then
+            echo "El paquete tiene archivos con el nombre rustdesk"
+            exit 1
+          fi
+          dylib="$APP/Contents/Frameworks/liblibrustdesk.dylib"
+          for bin in "$APP/Contents/MacOS/${NIXDESK_APP_NAME}" "$APP/Contents/MacOS/service" "$dylib"; do
+            lipo -archs "$bin"
+            lipo "$bin" -verify_arch "${MACH_ARCH}"
+          done
+          grep -c -a -F "${NIXDESK_RENDEZVOUS_SERVER}" "$dylib"
+          grep -c -a -F "${NIXDESK_RS_PUB_KEY}" "$dylib"
+          if grep -q -a -F "rs-ny.rustdesk.com" "$dylib" "$APP/Contents/MacOS/service"; then
+            echo "El binario conserva el servidor de RustDesk"
+            exit 1
+          fi
+          if grep -q -a -F "admin.rustdesk.com" "$dylib"; then
+            echo "El binario conserva el servidor de API de RustDesk"
+            exit 1
+          fi
+          if [ -n "${NIXDESK_API_SERVER}" ]; then
+            grep -c -a -F "${NIXDESK_API_SERVER%/}" "$dylib"
+          fi
+          # Logotipo propio para el panel izquierdo de la pantalla principal.
+          test -n "$(find "$APP" -name logo_dark.png)"
+          test -n "$(find "$APP" -name logo_light.png)"
+          # El binario carga y responde en el ejecutor (no abre ventana). Corte a los 60 s.
+          version="$(perl -e 'alarm 60; exec @ARGV' "$APP/Contents/MacOS/${NIXDESK_APP_NAME}" --version)"
+          echo "Versión que informa el binario: $version"
+          if [ "$version" != "${VERSION}" ]; then
+            echo "::warning::El binario informa la versión '$version' y se esperaba '${VERSION}'"
+          fi
+
+      - name: Crear el dmg
+        shell: bash
+        run: |
+          CREATE_DMG="$(command -v create-dmg)"
+          CREATE_DMG="$(readlink -f "$CREATE_DMG")"
+          sed -i -e 's/MAXIMUM_UNMOUNTING_ATTEMPTS=3/MAXIMUM_UNMOUNTING_ATTEMPTS=7/' "$CREATE_DMG"
+          dmg="${NIXDESK_PACKAGE_NAME}-${VERSION}-${ARCH}.dmg"
+          create-dmg --volname "${NIXDESK_APP_NAME}" --icon "${NIXDESK_APP_NAME}.app" 200 190 --hide-extension "${NIXDESK_APP_NAME}.app" --window-size 800 400 --app-drop-link 600 185 "$dmg" "$APP"
+          ls -l "$dmg"
+          shasum -a 256 "$dmg"
+          # La aplicación dentro de la imagen conserva la firma ad hoc.
+          montaje="$(mktemp -d)"
+          hdiutil attach -readonly -nobrowse -mountpoint "$montaje" "$dmg"
+          ls -la "$montaje"
+          estado=0
+          codesign --verify --deep --strict --verbose=2 "$montaje/${NIXDESK_APP_NAME}.app" || estado=1
+          hdiutil detach "$montaje" -force
+          exit "$estado"
+
+      - name: Upload dmg
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: nixdesk-macos-${{ matrix.job.arch }}-dmg
+          path: ${{ env.NIXDESK_PACKAGE_NAME }}-${{ env.VERSION }}-${{ matrix.job.arch }}.dmg # can not upload the directory directly or tar.gz, which destroy the link structure
+          if-no-files-found: error
