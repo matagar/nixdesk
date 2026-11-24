@@ -26,6 +26,48 @@ pub const API_SERVER: &str = "";
 #[used]
 static API_SERVER_EN_EL_BINARIO: &str = API_SERVER;
 
+/// Clave pública (Ed25519, base64 de 32 bytes) con la que el servidor de API firma
+/// los permisos de conexión (`GET /api/nixdesk/clave-publica`). No es un secreto.
+///
+/// El flujo de compilación reemplaza esta línea con el valor de
+/// `NIXDESK_PERMISO_PUB_KEY`. Vacía: el equipo no mira permisos (modo `no`).
+pub const PERMISO_PUB_KEY: &str = "";
+
+/// Copia de `PERMISO_PUB_KEY` que queda entera dentro del binario (ver `API_SERVER_EN_EL_BINARIO`).
+#[used]
+static PERMISO_PUB_KEY_EN_EL_BINARIO: &str = PERMISO_PUB_KEY;
+
+/// Qué hace el equipo controlado con el permiso de conexión: `no` (no lo mira),
+/// `aviso` (lo verifica y deja pasar siempre; si falta o no vale, lo registra y le
+/// avisa al panel) o `exigir` (sin permiso válido rechaza el inicio de sesión).
+///
+/// El flujo de compilación reemplaza esta línea con el valor de `NIXDESK_PERMISO_MODO`.
+pub const PERMISO_MODO: &str = "aviso";
+
+/// Opción del equipo que baja o sube el modo compilado: `N` (no mirar), `aviso` o
+/// `Y` (exigir). Vacía o con otro valor, vale `PERMISO_MODO`. Se fija en el equipo
+/// instalado, como administrador (root en Linux y macOS):
+///
+/// ```text
+/// nixdesk.exe --option nixdesk-exigir-permiso Y
+/// nixdesk.exe --option nixdesk-exigir-permiso ""    (vuelve al modo compilado)
+/// nixdesk.exe --option nixdesk-exigir-permiso       (muestra el valor)
+/// ```
+pub const OPCION_EXIGIR_PERMISO: &str = "nixdesk-exigir-permiso";
+
+/// Lo que ve quien intenta entrar a un equipo en modo `exigir` sin permiso válido.
+/// No dice el motivo exacto: ese queda en el registro del equipo y en la auditoría.
+pub const MSG_SOLO_AUTORIZADAS: &str = "Este equipo solo acepta conexiones autorizadas desde el panel de NixDesk. Iniciá sesión en NixDesk con tu usuario.";
+
+/// Modo vigente en este equipo (ver `nixdesk_permiso::modo_efectivo`).
+pub fn modo_permiso() -> crate::nixdesk_permiso::Modo {
+    crate::nixdesk_permiso::modo_efectivo(
+        PERMISO_MODO,
+        PERMISO_PUB_KEY,
+        &config::Config::get_option(OPCION_EXIGIR_PERMISO),
+    )
+}
+
 fn servidor_de_fabrica() -> &'static str {
     config::RENDEZVOUS_SERVERS.first().copied().unwrap_or("")
 }

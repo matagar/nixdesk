@@ -430,6 +430,10 @@ pub struct Connection {
     #[cfg(windows)]
     portable: PortableState,
     from_switch: bool,
+    // NixDesk: datos del permiso de conexión válido del último LoginRequest, y si
+    // esta conexión ya mandó su alarma por venir sin uno.
+    nixdesk_permiso: Option<crate::nixdesk_permiso::Datos>,
+    nixdesk_permiso_avisado: bool,
     voice_call_request_timestamp: Option<NonZeroI64>,
     voice_calling: bool,
     options_in_login: Option<OptionMessage>,
@@ -638,6 +642,8 @@ impl Connection {
             #[cfg(windows)]
             portable: Default::default(),
             from_switch: false,
+            nixdesk_permiso: None,
+            nixdesk_permiso_avisado: false,
             audio_sender: None,
             voice_call_request_timestamp: None,
             voice_calling: false,
@@ -1980,6 +1986,11 @@ impl Connection {
         if self.conn_audit_two_factor != ConnAuditTwoFactor::None {
             audit["two_factor"] = json!(self.conn_audit_two_factor.as_i64());
         }
+        // NixDesk: quién entró según el panel. El servidor de API guarda los campos que no conoce.
+        if let Some(permiso) = self.nixdesk_permiso.as_ref() {
+            audit["nixdesk_usr"] = json!(permiso.usr);
+            audit["nixdesk_rol"] = json!(permiso.rol);
+        }
         self.post_conn_audit(audit);
         #[allow(unused_mut)]
         let mut username = crate::platform::get_active_username();
@@ -2884,6 +2895,85 @@ impl Connection {
         }
     }
 
+    /// NixDesk: revisa el permiso de conexión firmado del `LoginRequest` recién
+    /// guardado en `self.lr`, según el modo del equipo. Se llama antes de mirar la
+    /// contraseña y de cualquier otra forma de aprobación. Devuelve `false` si hay
+    /// que cortar la conexión (modo `exigir` sin permiso válido).
+    ///
+    /// El rechazo no pasa por `check_failure`/`update_failure`: no cuenta como
+    /// intento fallido de contraseña ni bloquea la IP.
+    async fn nixdesk_revisar_permiso(&mut self) -> bool {
+        use crate::nixdesk_permiso::{verificar, Modo};
+        let modo = crate::nixdesk::modo_permiso();
+        if modo == Modo::No {
+            return true;
+        }
+        let res = verificar(
+            &self.lr.nixdesk_permiso,
+            crate::nixdesk::PERMISO_PUB_KEY,
+            &Config::get_id(),
+            &self.hash.challenge,
+            get_time() / 1000,
+        );
+        let motivo = match res {
+            Ok(datos) => {
+                // Un reintento con contraseña trae el mismo permiso: se anota una vez.
+                if self.nixdesk_permiso.as_ref() != Some(&datos) {
+                    log::info!(
+                        "NixDesk: permiso de conexion valido: conn_id={}, usr={}, rol={}, kid={}, id={}, ip={}, tipo={}",
+                        self.inner.id(),
+                        datos.usr,
+                        datos.rol,
+                        datos.kid,
+                        self.lr.my_id,
+                        self.ip,
+                        Self::login_scope_kind(&self.lr),
+                    );
+                }
+                self.nixdesk_permiso = Some(datos);
+                return true;
+            }
+            Err(motivo) => motivo,
+        };
+        self.nixdesk_permiso = None;
+        let rechazada = modo == Modo::Exigir;
+        log::warn!(
+            "NixDesk: conexion sin permiso valido ({}): conn_id={}, modo={}, rechazada={}, id={}, nombre={}, ip={}, tipo={}",
+            motivo.como_texto(),
+            self.inner.id(),
+            modo.como_texto(),
+            rechazada,
+            self.lr.my_id,
+            self.lr.my_name,
+            self.ip,
+            Self::login_scope_kind(&self.lr),
+        );
+        if !self.nixdesk_permiso_avisado {
+            // Una alarma por conexión, aunque el login se reintente.
+            self.nixdesk_permiso_avisado = true;
+            self.post_alarm_audit(
+                AlarmAuditType::NixdeskPermiso,
+                json!({
+                    "id": self.lr.my_id.clone(),
+                    "name": self.lr.my_name.clone(),
+                    "ip": self.ip.clone(),
+                    "conn_type": Self::login_scope_kind(&self.lr),
+                    "nixdesk": "permiso",
+                    "motivo": motivo.como_texto(),
+                    "modo": modo.como_texto(),
+                    "rechazada": rechazada,
+                }),
+            );
+        }
+        if rechazada {
+            self.send_login_error(crate::nixdesk::MSG_SOLO_AUTORIZADAS)
+                .await;
+            sleep(1.).await;
+            return false;
+        }
+        true
+    }
+
     async fn handle_login_request_without_validation(&mut self, lr: &LoginRequest) {
         self.lr = lr.clone();
         self.peer_argb = crate::str2color(&format!("{}{}", &lr.my_id, &lr.my_platform), 0xff);
@@ -3030,6 +3120,16 @@ impl Connection {
             {
                 self.send_login_error(crate::client::LOGIN_MSG_OFFLINE)
                     .await;
+                return false;
+            }
+
+            // NixDesk: el permiso firmado por el panel se revisa acá, antes de abrir
+            // el aviso de conexión entrante y de toda forma de aprobación (clic de
+            // aceptar, sesión reciente, contraseña, 2FA, equipo de confianza). Vale
+            // igual para control remoto, archivos, cámara, terminal y túnel, y para
+            // las conexiones por IP directa o por LAN, que llegan por este mismo
+            // mensaje.
+            if !self.nixdesk_revisar_permiso().await {
                 return false;
             }
 
@@ -6671,6 +6771,8 @@ pub enum AlarmAuditType {
     TerminalOsLoginConcurrency = 8,
     SessionScopeViolation = 9,
     IdWhitelist = 10,
+    // NixDesk: conexión sin permiso firmado válido (`info.motivo` dice por qué).
+    NixdeskPermiso = 90,
 }
 
 pub enum FileAuditType {
