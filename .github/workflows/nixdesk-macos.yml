@@ -35,6 +35,10 @@ env:
   # Actions > Variables). Vacío: la aplicación no usa ningún servidor de API
   # (tampoco los de RustDesk) y no muestra el inicio de sesión de cuenta.
   NIXDESK_API_SERVER: ${{ vars.NIXDESK_API_SERVER || '' }}
+  # Clave pública con la que el panel firma los permisos de conexión y modo con
+  # que el equipo los trata (no, aviso, exigir). Igual que en Windows y Linux.
+  NIXDESK_PERMISO_PUB_KEY: ${{ vars.NIXDESK_PERMISO_PUB_KEY || '' }}
+  NIXDESK_PERMISO_MODO: ${{ vars.NIXDESK_PERMISO_MODO || 'aviso' }}
 
 jobs:
   generate-bridge:
@@ -130,6 +134,10 @@ jobs:
           grep -nF "pub const API_SERVER: &str = \"${api}\";" "$f"
           if [ -z "$api" ]; then echo "Sin servidor de API"; else echo "Servidor de API: $api"; fi
 
+      - name: Aplicar el permiso de conexión de NixDesk
+        shell: bash
+        run: bash .github/scripts/nixdesk-aplicar-permiso.sh
+
       # El nombre del .app, el identificador de paquete y el esquema de URL están
       # en el código del fork (flutter/macos y build.py). Si no coinciden con los de
       # este flujo, se corta antes de compilar.
@@ -210,6 +218,10 @@ jobs:
           toolchain: ${{ env.MAC_RUST_VERSION }}
           targets: ${{ matrix.job.target }}
           components: "rustfmt"
+
+      - name: Probar la verificación del permiso de conexión
+        shell: bash
+        run: bash .github/scripts/nixdesk-probar-permiso.sh
 
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
@@ -334,6 +346,9 @@ jobs:
           fi
           if [ -n "${NIXDESK_API_SERVER}" ]; then
             grep -c -a -F "${NIXDESK_API_SERVER%/}" "$dylib"
+          fi
+          if [ -n "${NIXDESK_PERMISO_PUB_KEY}" ]; then
+            grep -c -a -F "${NIXDESK_PERMISO_PUB_KEY}" "$dylib"
           fi
           # Logotipo propio para el panel izquierdo de la pantalla principal.
           test -n "$(find "$APP" -name logo_dark.png)"
