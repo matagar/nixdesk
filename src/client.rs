@@ -94,6 +94,7 @@ use crate::ui_session_interface::SessionPermissionConfig;
 pub use super::lang::*;
 
 mod login_method;
+mod nixdesk_permiso;
 
 #[cfg(not(target_os = "linux"))]
 mod audio_playback;
@@ -2885,6 +2886,9 @@ pub struct LoginConfigHandler {
     pub enable_trusted_devices: bool,
     pub record_state: bool,
     pub record_permission: bool,
+    /// NixDesk: permiso de conexión firmado por el panel para el desafío vigente
+    /// (ver `client/nixdesk_permiso.rs`). Va en todos los `LoginRequest`.
+    nixdesk_permiso: Option<nixdesk_permiso::Guardado>,
 }
 
 impl Deref for LoginConfigHandler {
@@ -3868,6 +3872,7 @@ impl LoginConfigHandler {
             os_login,
             hwid,
             avatar,
+            nixdesk_permiso: self.nixdesk_permiso_para_login(),
             ..Default::default()
         };
         if self.skips_saved_password() {
@@ -4654,6 +4659,27 @@ pub async fn handle_hash(
     peer: &mut Stream,
 ) -> bool {
     lc.write().unwrap().hash = hash.clone();
+    // NixDesk: con el desafío de esta conexión en la mano se le pide al panel el
+    // permiso firmado, antes de armar cualquier `LoginRequest` (también el del
+    // cambio de lados). Si el panel dice que este usuario no puede entrar a ese
+    // equipo, se muestra su mensaje y no se pide la contraseña.
+    // (La vuelta de un cambio de lados no se frena acá: la pidió el otro equipo.)
+    let cambio_de_lados = lc.read().unwrap().switch_uuid.is_some();
+    if let Err(mensaje) = nixdesk_permiso::actualizar(&lc).await.or_else(|mensaje| {
+        if cambio_de_lados {
+            Ok(())
+        } else {
+            Err(mensaje)
+        }
+    }) {
+        interface.msgbox("error", "Login Error", &mensaje, "");
+        let mut misc = Misc::new();
+        misc.set_close_reason("Sin permiso del panel de NixDesk".to_owned());
+        let mut msg = Message::new();
+        msg.set_misc(misc);
+        allow_err!(peer.send(&msg).await);
+        return false;
+    }
     // Take care of password application order
 
     // switch_uuid
@@ -4893,6 +4919,12 @@ pub async fn handle_login_from_ui(
     hasher2.update(&hash_password[..]);
     hasher2.update(&lc.read().unwrap().hash.challenge);
     hash_password = hasher2.finalize()[..].to_vec();
+
+    // NixDesk: el reintento lleva el mismo permiso; si pasó un rato desde que se
+    // pidió (vence a los pocos minutos), se pide otro para el mismo desafío.
+    if let Err(mensaje) = nixdesk_permiso::actualizar(&lc).await {
+        bail!(mensaje);
+    }
 
     send_login(
         lc.clone(),
