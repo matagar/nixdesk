@@ -177,14 +177,19 @@ case "$orden" in
     if grep -q 'CN=Android Debug' "$salida"; then
       fallar "El APK quedó firmado con la clave de depuración"
     fi
-    if [ "$(grep -c -E '^Signer #[0-9]+ certificate SHA-256 digest: ' "$salida")" != "1" ]; then
+    # apksigner rotula cada firmante según la versión: "Signer #1 certificate ..." o "V2 Signer: certificate ...".
+    # Se cuenta con su propia línea "Number of signers" y se exige que todas las huellas informadas sean la misma.
+    if ! grep -q -E '^Number of signers: 1$' "$salida"; then
       fallar "Se esperaba un solo firmante en el APK"
     fi
-    huella="$(grep -m 1 -E '^Signer #1 certificate SHA-256 digest: ' "$salida" | awk '{print $NF}')"
+    if [ "$(grep -E ' certificate SHA-256 digest: ' "$salida" | awk '{print $NF}' | sort -u | wc -l)" != "1" ]; then
+      fallar "El APK informa más de un certificado, o ninguno"
+    fi
+    huella="$(grep -m 1 -E ' certificate SHA-256 digest: ' "$salida" | awk '{print $NF}')"
     if [ "$huella" != "$esperada" ]; then
       fallar "El APK está firmado con otro certificado (APK: $huella; almacén: $esperada)"
     fi
-    sujeto="$(grep -m 1 -E '^Signer #1 certificate DN: ' "$salida" | sed -E 's/^Signer #1 certificate DN: //')"
+    sujeto="$(grep -m 1 -E ' certificate DN: ' "$salida" | sed -E 's/^.* certificate DN: //')"
     esquemas="$(grep -E '^Verified using v[0-9.]+ scheme .*: true$' "$salida" | sed -E 's/^Verified using (v[0-9.]+) scheme.*/\1/' | tr '\n' ' ')"
     con_dos_puntos="$(printf '%s' "$huella" | tr 'a-f' 'A-F' | sed -E 's/(..)/\1:/g; s/:$//')"
     echo "Firma verificada. Huella SHA-256 del certificado: $huella"

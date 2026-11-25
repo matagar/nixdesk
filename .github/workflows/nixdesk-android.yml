@@ -514,11 +514,15 @@ jobs:
             echo ""
           } >> "$GITHUB_STEP_SUMMARY"
 
+      # Se sube aunque falle un control de más arriba (el job queda igual en rojo): así
+      # se puede mirar el APK sin esperar otra compilación entera. Un APK de una
+      # corrida en rojo no se instala sin revisar por qué falló.
       - name: Upload apk
+        if: ${{ !cancelled() && env.APK != '' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: nixdesk-android-${{ matrix.job.apk-arch }}-apk
           path: |
             ${{ env.NIXDESK_PACKAGE_NAME }}-${{ env.VERSION }}-android-${{ matrix.job.apk-arch }}.apk
             ${{ env.NIXDESK_PACKAGE_NAME }}-${{ env.VERSION }}-android-${{ matrix.job.apk-arch }}.apk.sha256
-          if-no-files-found: error
+          if-no-files-found: warn
