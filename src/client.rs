@@ -3861,6 +3861,17 @@ impl LoginConfigHandler {
         } else {
             Bytes::new()
         };
+        // NixDesk: terminal de administrador con sesión iniciada en el panel y sin
+        // cuenta de Windows escrita: va el usuario convenido y el equipo decide con
+        // el permiso firmado (ver `nixdesk_permiso::USUARIO_TERMINAL_ADMIN`).
+        let os_username = if self.is_terminal_admin
+            && os_username.trim().is_empty()
+            && !LocalConfig::get_option("access_token").is_empty()
+        {
+            crate::nixdesk_permiso::USUARIO_TERMINAL_ADMIN.to_owned()
+        } else {
+            os_username
+        };
         let os_login: MessageField<OSLogin> = if self.conn_type == ConnType::TERMINAL {
             Some(OSLogin {
                 username: os_username,
@@ -4787,7 +4798,10 @@ pub async fn handle_hash(
 
     let is_terminal_admin = lc.read().unwrap().is_terminal_admin;
     let is_terminal = lc.read().unwrap().conn_type.eq(&ConnType::TERMINAL);
-    if is_terminal && is_terminal_admin {
+    // NixDesk: con sesión iniciada en el panel no se pide una cuenta de Windows; sigue
+    // el camino común (contraseña de conexión) y el permiso firmado decide en el equipo.
+    let con_sesion_del_panel = !LocalConfig::get_option("access_token").is_empty();
+    if is_terminal && is_terminal_admin && !con_sesion_del_panel {
         if request_approval {
             interface.msgbox("terminal-admin-login-request-approval", "", "", "");
         } else if password.is_empty() {

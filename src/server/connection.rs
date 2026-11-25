@@ -4297,6 +4297,28 @@ impl Connection {
     #[cfg(target_os = "windows")]
     fn fill_terminal_user_token(&mut self, username: &str, password: &str) -> Option<&'static str> {
         // No need to check if the password is empty.
+        // NixDesk: terminal de administrador sin cuenta de Windows. Vale solo con un
+        // permiso firmado por el panel, verificado para esta conexión, de un usuario
+        // administrador. No se consulta ninguna cuenta: la terminal corre con la
+        // identidad del servicio, igual que después de validar un administrador.
+        if username == crate::nixdesk_permiso::USUARIO_TERMINAL_ADMIN {
+            let admin = self
+                .nixdesk_permiso
+                .as_ref()
+                .map_or(false, |p| p.rol == "admin");
+            log::info!(
+                "NixDesk: terminal de administrador por permiso: conn_id={}, concedida={}, usr={}",
+                self.inner.id(),
+                admin,
+                self.nixdesk_permiso.as_ref().map_or("", |p| p.usr.as_str()),
+            );
+            if admin {
+                self.terminal_user_token = Some(TerminalUserToken::SelfUser);
+                return None;
+            }
+            self.terminal_user_token = None;
+            return Some("NixDesk: para la terminal de administrador sin cuenta de Windows hay que iniciar sesion en NixDesk con un usuario administrador del panel.");
+        }
         if !username.is_empty() {
             return self.handle_administrator_check(username, password);
         }

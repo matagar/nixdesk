@@ -29,6 +29,13 @@ pub const TOLERANCIA_SEG: i64 = 300;
 /// Un permiso real mide unos 300 caracteres; lo que pase de esto no se analiza.
 const LARGO_MAXIMO: usize = 2048;
 
+/// Terminal de administrador sin cuenta de Windows: quien controla, con sesión
+/// iniciada en el panel, manda este "usuario" en `os_login` en lugar de uno real.
+/// El equipo lo acepta solo si la conexión trae un permiso válido con rol `admin`.
+/// Lleva asteriscos porque Windows no admite ese carácter en un nombre de usuario:
+/// nunca coincide con una cuenta de verdad.
+pub const USUARIO_TERMINAL_ADMIN: &str = "*nixdesk-permiso*";
+
 /// Lo que el equipo anota de un permiso válido.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Datos {
